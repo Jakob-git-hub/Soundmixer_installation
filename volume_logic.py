@@ -10,19 +10,12 @@ import csv
 COM_PORT = 'COM9'
 BAUD_RATE = 115200 
 
-# Wie viele Regler das System aktuell unterstützt
 NUM_SLIDERS = 5 
 
-# Lautstärkelogik:
-MIN_CHANGE_THRESHOLD = 2      # Eine Änderung von 2% ist notwendig (2 von 100)
+MIN_CHANGE_THRESHOLD = 2
+
 CONFIG_FILE = 'config.csv'
-DEFAULT_MAPPING = {
-    0: "System",
-    1: "Spotify.exe",
-    2: "firefox.exe",
-    3: "discord.exe",
-    4: "chrome.exe"
-}
+DEFAULT_MAPPING = { 0: "System", 1: "Spotify.exe", 2: "firefox.exe", 3: "discord.exe", 4: "chrome.exe" }
 
 # Globale Variablen zur Statusverwaltung
 LAST_VOLUME_VALUES = {}       # Speichert den zuletzt gesetzten Prozentwert (0-100)
@@ -31,7 +24,6 @@ CURRENT_DISPLAY_VALUES = {i: 0.0 for i in range(NUM_SLIDERS)} # Initialisiert 5 
 # --- KONFIGURATION LADEN ---
 
 def load_app_mapping(filename=CONFIG_FILE):
-    """Läd das APP_MAPPING aus der CSV-Datei."""
     app_map = {}
     
     # 1. Versuche, die Konfiguration aus der Datei zu laden
@@ -39,26 +31,22 @@ def load_app_mapping(filename=CONFIG_FILE):
         with open(filename, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.reader(file)
             next(reader)  # Überspringe die Header-Zeile
-            for row in reader:
-                if len(row) == 2:
-                    try:
-                        index = int(row[0])
-                        # Speichere den Prozessnamen (oder "KEINE ZUORDNUNG", wenn leer)
-                        process_name = row[1] if row[1].strip() != "" else "KEINE ZUORDNUNG"
-                        app_map[index] = process_name
-                    except ValueError:
-                        # Ignoriere Zeilen mit ungültigem Index
-                        continue
-    except FileNotFoundError:
-        # 2. Wenn die Datei nicht existiert, verwende Standardwerte
-        app_map = DEFAULT_MAPPING
-    
-    # 3. Ergänze fehlende Regler mit "KEINE ZUORDNUNG" (falls die CSV unvollständig war)
-    for i in range(NUM_SLIDERS):
-        if i not in app_map:
-            app_map[i] = "KEINE ZUORDNUNG"
+            for row in reader:  
+                try:                
+                    process_name = row[1] if row[1].strip() != "" else "NONE"
+                    app_map.append = process_name
+                except ValueError:
+                    # Ignoriere Zeilen mit ungültigem Index
+                    continue
+                    
+            NUM_SLIDERS - len(app_map) = Diff
+            while Diff > 0: 
+                app_map.append("NONE")
+                
+            return app_map
             
-    return app_map
+    except FileNotFoundError:
+        return DEFAULT_MAPPING
 
 APP_MAPPING = load_app_mapping() 
 
