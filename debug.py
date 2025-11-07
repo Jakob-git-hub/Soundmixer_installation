@@ -1,10 +1,12 @@
+import csv
+
 CONFIG_FILE = 'config.csv'
 DEFAULT_MAPPING = { 0: "System", 1: "Spotify.exe", 2: "firefox.exe", 3: "discord.exe", 4: "chrome.exe" }
-
-
+NUM_SLIDERS = 5
+print("START")
 def load_app_mapping(filename=CONFIG_FILE):
-    app_map = {}
-    
+    app_map = []
+   
     # 1. Versuche, die Konfiguration aus der Datei zu laden
     try:
         with open(filename, mode='r', newline='', encoding='utf-8') as file:
@@ -13,12 +15,12 @@ def load_app_mapping(filename=CONFIG_FILE):
             for row in reader:  
                 try:                
                     process_name = row[1] if row[1].strip() != "" else "NONE"
-                    app_map.append = process_name
-                except ValueError:
+                    app_map.append(process_name)
+                except ValueError or IndexError:
                     # Ignoriere Zeilen mit ungültigem Index
                     continue
                     
-            NUM_SLIDERS - len(app_map) = Diff
+            Diff = NUM_SLIDERS - len(app_map) 
             while Diff > 0: 
                 app_map.append("NONE")
                 
