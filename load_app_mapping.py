@@ -1,10 +1,10 @@
 import csv
 
 CONFIG_FILE = 'config.csv'
-DEFAULT_MAPPING = { 0: "System", 1: "Spotify.exe", 2: "firefox.exe", 3: "discord.exe", 4: "chrome.exe" }
-NUM_SLIDERS = 2
+DEFAULT_MAPPING = ["System", "Spotify.exe", "firefox.exe", "discord.exe", "chrome.exe"]
+
 print("START")
-def load_app_mapping(filename=CONFIG_FILE):
+def load_app_mapping(filename, NUM_SLIDERS):
     app_map = []
     
     # 1. Versuche, die Konfiguration aus der Datei zu laden
@@ -31,5 +31,6 @@ def load_app_mapping(filename=CONFIG_FILE):
     except FileNotFoundError:
         return DEFAULT_MAPPING
 
-APP_MAPPING = load_app_mapping() 
-print(APP_MAPPING)
+if __name__ == "__main__":
+    load_app_mapping(CONFIG_FILE, 5)
+    print("Mapping geladen:", APP_MAPPING)

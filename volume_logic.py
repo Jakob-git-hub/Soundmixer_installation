@@ -6,6 +6,8 @@ import time
 import os
 import csv
 
+from load_app_mapping import load_app_mapping 
+
 # --- KONFIGURATION ---
 COM_PORT = 'COM9'
 BAUD_RATE = 115200 
@@ -15,7 +17,7 @@ NUM_SLIDERS = 5
 MIN_CHANGE_THRESHOLD = 2
 
 CONFIG_FILE = 'config.csv'
-DEFAULT_MAPPING = { 0: "System", 1: "Spotify.exe", 2: "firefox.exe", 3: "discord.exe", 4: "chrome.exe" }
+DEFAULT_MAPPING = ["System", "Spotify.exe", "firefox.exe", "discord.exe", "chrome.exe"]
 
 # Globale Variablen zur Statusverwaltung
 LAST_VOLUME_VALUES = {}       # Speichert den zuletzt gesetzten Prozentwert (0-100)
@@ -23,7 +25,7 @@ CURRENT_DISPLAY_VALUES = {i: 0.0 for i in range(NUM_SLIDERS)} # Initialisiert 5 
 
 # --- KONFIGURATION LADEN ---
 
-def load_app_mapping(filename=CONFIG_FILE):
+def load_app_mapping_not_used(filename=CONFIG_FILE):
     app_map = {}
     
     # 1. Versuche, die Konfiguration aus der Datei zu laden
@@ -48,7 +50,7 @@ def load_app_mapping(filename=CONFIG_FILE):
     except FileNotFoundError:
         return DEFAULT_MAPPING
 
-APP_MAPPING = load_app_mapping() 
+APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
 
 # --- PYCAW & LAUTSTÄRKE-FUNKTIONEN ---
 
@@ -61,8 +63,8 @@ def get_session_volume_control(process_name):
             return interface.QueryInterface(IAudioEndpointVolume)
         except Exception:
             return None
-    
-    if process_name == "KEINE ZUORDNUNG":
+
+    if process_name == "NONE":
         return None
 
     sessions = AudioUtilities.GetAllSessions()
@@ -114,9 +116,7 @@ def set_filtered_volume(regler_index, new_input_value):
     CURRENT_DISPLAY_VALUES[regler_index] = target_volume_scalar
     return is_updated
 
-# --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
-
-def main():
+def COM_Setup():
     try:
         # CoInitialize muss einmal pro Thread aufgerufen werden, um COM-Objekte zu nutzen
         pythoncom.CoInitialize() 
@@ -133,7 +133,22 @@ def main():
 
     print("--- Serielle Lautstärkeregelung (5 Regler) gestartet ---")
     
-    # NEU: Zähler, um die Konsolenausgabe regelmäßig zu aktualisieren, auch wenn sich die Lautstärke nicht ändert.
+
+
+# --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
+
+def main():
+    
+
+    NUM_SLIDERS = 5 
+
+    MIN_CHANGE_THRESHOLD = 2
+
+    CONFIG_FILE = 'config.csv'
+    
+    COM_Setup()
+    
+    
     display_update_counter = 0
     UPDATE_FREQUENCY = 50 # Update alle 50 Schleifendurchläufe
 
@@ -147,33 +162,17 @@ def main():
             if line:
                 data_string = line.decode('utf-8').strip()
                 
-                # --- DEBUGGING: UNKOMMENTIEREN, UM ROHDATEN ZU SEHEN ---
-                # if data_string:
-                #    print(f"DEBUG: Rohdaten: {data_string}")
-                # --------------------------------------------------------
-                
-                # Erwartetes Format: Zahl|Zahl|Zahl|Zahl|Zahl (z.B. 45|90|0|10|55)
                 if '|' in data_string:
                     str_values = data_string.split('|')
-                    
-                    # PRÜFUNG: Muss mindestens so viele Werte haben wie Regler konfiguriert
-                    if len(str_values) >= NUM_SLIDERS:
-                        int_values = []
-                        
-                        # Wir verarbeiten nur die ersten NUM_SLIDERS Werte
-                        for s in str_values[:NUM_SLIDERS]:
-                            try:
-                                # Die Werte sind bereits 0-100
-                                int_values.append(int(s.strip()))
-                            except ValueError:
-                                # Wenn ein Wert nicht geparst werden kann, verwenden wir 0
-                                int_values.append(0) 
+                    value_list=[]
+                    for s in str_values:
+                        value_list.append(int(s))
 
-                        if len(int_values) == NUM_SLIDERS:
-                            for index, value in enumerate(int_values):
-                                # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
-                                if set_filtered_volume(index, value):
-                                    value_changed = True
+                    if len(value_list) == NUM_SLIDERS:
+                        for value in value_list:
+                            # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
+                            if set_filtered_volume(value):
+                                value_changed = True
             
             # NEU: Konsolenausgabe nur bei einer Änderung ODER wenn das Update fällig ist
             display_update_counter += 1
@@ -210,5 +209,7 @@ def main():
     except Exception:
         pass
 
+
+    
 if __name__ == "__main__":
     main()
