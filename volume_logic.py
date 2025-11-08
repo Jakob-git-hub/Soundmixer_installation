@@ -9,50 +9,13 @@ import csv
 from load_app_mapping import load_app_mapping 
 
 # --- KONFIGURATION ---
-COM_PORT = 'COM9'
-BAUD_RATE = 115200 
+ 
 
 NUM_SLIDERS = 5 
 
 MIN_CHANGE_THRESHOLD = 2
 
-CONFIG_FILE = 'config.csv'
-DEFAULT_MAPPING = ["System", "Spotify.exe", "firefox.exe", "discord.exe", "chrome.exe"]
-
-# Globale Variablen zur Statusverwaltung
-LAST_VOLUME_VALUES = {}       # Speichert den zuletzt gesetzten Prozentwert (0-100)
-CURRENT_DISPLAY_VALUES = {i: 0.0 for i in range(NUM_SLIDERS)} # Initialisiert 5 Einträge
-
-# --- KONFIGURATION LADEN ---
-
-def load_app_mapping_not_used(filename=CONFIG_FILE):
-    app_map = {}
-    
-    # 1. Versuche, die Konfiguration aus der Datei zu laden
-    try:
-        with open(filename, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader)  # Überspringe die Header-Zeile
-            for row in reader:  
-                try:                
-                    process_name = row[1] if row[1].strip() != "" else "NONE"
-                    app_map.append = process_name
-                except ValueError:
-                    # Ignoriere Zeilen mit ungültigem Index
-                    continue
-                    
-            NUM_SLIDERS - len(app_map) = Diff
-            while Diff > 0: 
-                app_map.append("NONE")
-                
-            return app_map
-            
-    except FileNotFoundError:
-        return DEFAULT_MAPPING
-
-APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
-
-# --- PYCAW & LAUTSTÄRKE-FUNKTIONEN ---
+#CONFIG_FILE = 'config.csv'
 
 def get_session_volume_control(process_name):
     """Gibt das Lautstärke-Steuerelement für den Prozess zurück."""
@@ -74,9 +37,9 @@ def get_session_volume_control(process_name):
             
     return None
 
-def set_filtered_volume(regler_index, new_input_value):
+def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
     """Setzt die Lautstärke unter Berücksichtigung von Debouncing und Skalierung."""
-    
+    LAST_VOLUME_VALUES = []       
     # Wert prüfen (erwartet 0-100 vom Pico)
     try:
         filtered_value = int(new_input_value)
@@ -96,7 +59,7 @@ def set_filtered_volume(regler_index, new_input_value):
     target_volume_scalar = filtered_value / 100.0
     
     # 3. Lautstärke setzen
-    app_name = APP_MAPPING.get(regler_index)
+    app_name = APP_MAPPING[regler_index]
     volume_control = get_session_volume_control(app_name)
     
     is_updated = False
@@ -116,7 +79,19 @@ def set_filtered_volume(regler_index, new_input_value):
     CURRENT_DISPLAY_VALUES[regler_index] = target_volume_scalar
     return is_updated
 
-def COM_Setup():
+
+    
+    
+
+
+# --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
+
+def main():
+    NUM_SLIDERS = 5 
+    CONFIG_FILE = 'config.csv'
+    
+    COM_PORT = 'COM9'
+    BAUD_RATE = 115200
     try:
         # CoInitialize muss einmal pro Thread aufgerufen werden, um COM-Objekte zu nutzen
         pythoncom.CoInitialize() 
@@ -132,84 +107,59 @@ def COM_Setup():
         return
 
     print("--- Serielle Lautstärkeregelung (5 Regler) gestartet ---")
-    
 
-
-# --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
-
-def main():
-    
-
-    NUM_SLIDERS = 5 
-
-    MIN_CHANGE_THRESHOLD = 2
-
-    CONFIG_FILE = 'config.csv'
-    
-    COM_Setup()
-    
-    
-    display_update_counter = 0
-    UPDATE_FREQUENCY = 50 # Update alle 50 Schleifendurchläufe
-
-    while True:
-        value_changed = False 
-        
-        try:
-            # Liest eine Zeile vom seriellen Port (endet mit \r oder \n)
-            line = ser.readline()
-            
-            if line:
-                data_string = line.decode('utf-8').strip()
-                
-                if '|' in data_string:
-                    str_values = data_string.split('|')
-                    value_list=[]
-                    for s in str_values:
-                        value_list.append(int(s))
-
-                    if len(value_list) == NUM_SLIDERS:
-                        for value in value_list:
-                            # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
-                            if set_filtered_volume(value):
-                                value_changed = True
-            
-            # NEU: Konsolenausgabe nur bei einer Änderung ODER wenn das Update fällig ist
-            display_update_counter += 1
-            should_update_display = value_changed or (display_update_counter >= UPDATE_FREQUENCY)
-
-            if should_update_display:
-                os.system('cls' if os.name == 'nt' else 'clear')
-                print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
-                
-                for i in range(NUM_SLIDERS):
-                    name = APP_MAPPING.get(i, "UNBEKANNT")
-                    current_vol_perc = int(CURRENT_DISPLAY_VALUES.get(i, 0.0) * 100)
-                    
-                    # Zeige "KEINE ZUORDNUNG" mit 0% an
-                    display_name = name if name != "KEINE ZUORDNUNG" else f"Regler {i+1} (Nicht zugeordnet)"
-                    
-                    print(f"Regler {i+1} ({display_name}): Lautstärke: {current_vol_perc}%")
-                
-                # Counter zurücksetzen, wenn aktualisiert wurde
-                if display_update_counter >= UPDATE_FREQUENCY:
-                    display_update_counter = 0
-        
-        except sp.SerialTimeoutException:
-            # Kein Fehler, wenn Timeout erreicht wird, ohne Daten zu finden
-            pass
-        except Exception as e:
-            # Allgemeine Fehlerbehandlung
-            print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
-            time.sleep(1)
-            
-    ser.close()
+    LAST_VOLUME_VALUES = []       # Speichert den zuletzt gesetzten Prozentwert (0-100)
+    CURRENT_DISPLAY_VALUES = [0.0 for i in range(NUM_SLIDERS)]
+    # Initialisiert 5 Einträge
     try:
-        pythoncom.CoUninitialize()
-    except Exception:
-        pass
+        while True:
+            value_changed = False 
+            APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
+            try:
+            # Liest eine Zeile vom seriellen Port (endet mit \r oder \n)
+                line = ser.readline()
+            
+                if line:
+                    data_string = line.decode('utf-8').strip()
 
+                    if '|' in data_string:
+                        str_values = data_string.split('|')
+                        value_list=[]
+                        for s in str_values:
+                            value_list.append(int(s))
 
+                        if len(value_list) == NUM_SLIDERS:
+                            i = 0
+                            for value in value_list:
+
+                                # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
+                                if set_filtered_volume(i,value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
+                                    value_changed = True
+                                i += 1    
+            # Aktualisiere die Konsolenausgabe nur bei value_changed = TRUE Schleifendurchläufe
+                if value_changed:
+                    os.system('cls' if os.name == 'nt' else 'clear')
+                    print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
+                
+                    for i in range(NUM_SLIDERS):
+                        name = APP_MAPPING[i]
+                        current_vol_perc = int(CURRENT_DISPLAY_VALUES[i] * 100)
+
+                        print(f"Regler {i+1} ({name}): Lautstärke: {current_vol_perc}%")
+
+            except sp.SerialTimeoutException:
+            # Kein Fehler, wenn Timeout erreicht wird, ohne Daten zu finden
+                pass
+            except Exception as e:
+            # Allgemeine Fehlerbehandlung
+                print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
+                time.sleep(1)
+    except KeyboardInterrupt:        
+        ser.close()
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
     
 if __name__ == "__main__":
     main()
