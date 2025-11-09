@@ -10,7 +10,8 @@ NUM_SLIDERS = 5
 MIN_CHANGE_THRESHOLD = 0.02  # Minimale Änderungsschwelle (2%)
 
 def get_session_volume_control(process_name):
-    """Gibt das Lautstärke-Steuerelement für den Prozess zurück."""
+    """Gibt das Lautstärke-Steuerelement für den Prozess zurück.
+    Für 'System' -> IAudioEndpointVolume, für Prozesse -> Liste von ISimpleAudioVolume (evtl. mehrere Sessions)."""
     if process_name == "System":
         try:
             devices = AudioUtilities.GetSpeakers()
@@ -23,11 +24,14 @@ def get_session_volume_control(process_name):
         return None
 
     sessions = AudioUtilities.GetAllSessions()
+    controls = []
     for session in sessions:
         if session.Process and session.Process.name() == process_name:
-            return session._ctl.QueryInterface(ISimpleAudioVolume)
-            
-    return None
+            try:
+                controls.append(session._ctl.QueryInterface(ISimpleAudioVolume))
+            except Exception:
+                continue
+    return controls if controls else None
 
 def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
     """Setzt die Lautstärke unter Berücksichtigung von Debouncing und Skalierung."""
@@ -51,12 +55,27 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
     is_updated = False
     if volume_control:
         # Lautstärke setzen
-        if app_name == "System":
-            volume_control.SetMasterVolumeLevelScalar(target_volume_scalar, None)
-        else:
-            volume_control.SetMasterVolume(target_volume_scalar, None)
-        
-        is_updated = True 
+        try:
+            if app_name == "System":
+                # Single endpoint interface
+                volume_control.SetMasterVolumeLevelScalar(target_volume_scalar, None)
+                is_updated = True
+            else:
+                # Für Prozesse: volume_control kann eine Liste von Session-Interfaces sein
+                if isinstance(volume_control, list):
+                    for ctl in volume_control:
+                        try:
+                            ctl.SetMasterVolume(target_volume_scalar, None)
+                        except Exception:
+                            # einzelne Session fehlgeschlagen -> weiter zu nächsten
+                            continue
+                    is_updated = len(volume_control) > 0
+                else:
+                    # Falls aus irgendeinem Grund ein einzelnes Interface zurückkam
+                    volume_control.SetMasterVolume(target_volume_scalar, None)
+                    is_updated = True
+        except Exception:
+            is_updated = False
     else:
         # Kein Lautstärke-Steuerelement gefunden
         pass
