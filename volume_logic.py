@@ -1,21 +1,13 @@
 import serial as sp
-import pythoncom
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
-import time
-import os
-import csv
+import time, os, pythoncom
 
 from load_app_mapping import load_app_mapping 
 
-# --- KONFIGURATION ---
- 
-
+#Konstante Definitionen
 NUM_SLIDERS = 5 
-
 MIN_CHANGE_THRESHOLD = 2
-
-#CONFIG_FILE = 'config.csv'
 
 def get_session_volume_control(process_name):
     """Gibt das Lautstärke-Steuerelement für den Prozess zurück."""
@@ -39,31 +31,24 @@ def get_session_volume_control(process_name):
 
 def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
     """Setzt die Lautstärke unter Berücksichtigung von Debouncing und Skalierung."""
-    LAST_VOLUME_VALUES = []       
+           
     # Wert prüfen (erwartet 0-100 vom Pico)
     try:
         filtered_value = int(new_input_value)
     except ValueError:
         return False # Ungültiger Wert
-    
-    # Begrenzung auf 0-100
-    filtered_value = max(0, min(100, filtered_value))
-    
+    #Skalierung auf 0.0 - 1.0
+    target_volume_scalar = (max(0, min(100, filtered_value)) / 100.0)
+
     # 1. Filterung kleiner Änderungen (Debouncing)
-    last_value = LAST_VOLUME_VALUES.get(regler_index, -1)
-    
-    if last_value != -1 and abs(filtered_value - last_value) < MIN_CHANGE_THRESHOLD:
+    last_value = CURRENT_DISPLAY_VALUES[regler_index]
+    if last_value != 0.0 and abs(target_volume_scalar - last_value) < MIN_CHANGE_THRESHOLD:
         return False 
-    
-    # 2. Lautstärke-Mapping (0-100 auf 0.0-1.0)
-    target_volume_scalar = filtered_value / 100.0
-    
     # 3. Lautstärke setzen
     app_name = APP_MAPPING[regler_index]
     volume_control = get_session_volume_control(app_name)
     
     is_updated = False
-    
     if volume_control:
         # Lautstärke setzen
         if app_name == "System":
@@ -72,26 +57,25 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
             volume_control.SetMasterVolume(target_volume_scalar, None)
         
         # Speichern des neuen gültigen Wertes
-        LAST_VOLUME_VALUES[regler_index] = filtered_value
+        CURRENT_DISPLAY_VALUES[regler_index] = filtered_value
         is_updated = True 
-
+    else:
+        # Kein Lautstärke-Steuerelement gefunden
+        pass
+        is_updated = False
     # 4. Speichern des aktuellen Status für die Konsolenausgabe
     CURRENT_DISPLAY_VALUES[regler_index] = target_volume_scalar
     return is_updated
 
 
-    
-    
-
-
 # --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
 
-def main():
-    NUM_SLIDERS = 5 
+def main(): 
     CONFIG_FILE = 'config.csv'
     
     COM_PORT = 'COM9'
     BAUD_RATE = 115200
+    
     try:
         # CoInitialize muss einmal pro Thread aufgerufen werden, um COM-Objekte zu nutzen
         pythoncom.CoInitialize() 
@@ -108,7 +92,7 @@ def main():
 
     print("--- Serielle Lautstärkeregelung (5 Regler) gestartet ---")
 
-    LAST_VOLUME_VALUES = []       # Speichert den zuletzt gesetzten Prozentwert (0-100)
+    
     CURRENT_DISPLAY_VALUES = [0.0 for i in range(NUM_SLIDERS)]
     # Initialisiert 5 Einträge
     try:
@@ -118,7 +102,7 @@ def main():
             try:
             # Liest eine Zeile vom seriellen Port (endet mit \r oder \n)
                 line = ser.readline()
-            
+                #Einlesen und Verarbeiten der Lautstärkedaten
                 if line:
                     data_string = line.decode('utf-8').strip()
 
@@ -127,24 +111,21 @@ def main():
                         value_list=[]
                         for s in str_values:
                             value_list.append(int(s))
-
-                        if len(value_list) == NUM_SLIDERS:
-                            i = 0
-                            for value in value_list:
-
+                        #Ändert die Lautstärke nur, wenn alle 5 Reglerwerte empfangen wurden
+                        if len(value_list) == NUM_SLIDERS: 
+                            for regler_index, value in enumerate(value_list):
+                                if APP_MAPPING[regler_index] != "Nicht zugeordnet":
                                 # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
-                                if set_filtered_volume(i,value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
-                                    value_changed = True
-                                i += 1    
-            # Aktualisiere die Konsolenausgabe nur bei value_changed = TRUE Schleifendurchläufe
+                                    if set_filtered_volume(regler_index, value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
+                                        value_changed = True
+
+            # Aktualisiere die Konsolenausgabe nur bei value_changed = TRUE
                 if value_changed:
                     os.system('cls' if os.name == 'nt' else 'clear')
                     print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
-                
                     for i in range(NUM_SLIDERS):
                         name = APP_MAPPING[i]
                         current_vol_perc = int(CURRENT_DISPLAY_VALUES[i] * 100)
-
                         print(f"Regler {i+1} ({name}): Lautstärke: {current_vol_perc}%")
 
             except sp.SerialTimeoutException:
