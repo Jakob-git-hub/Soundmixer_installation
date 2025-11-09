@@ -7,7 +7,7 @@ from load_app_mapping import load_app_mapping
 
 #Konstante Definitionen
 NUM_SLIDERS = 5 
-MIN_CHANGE_THRESHOLD = 2
+MIN_CHANGE_THRESHOLD = 0.02  # Minimale Änderungsschwelle (2%)
 
 def get_session_volume_control(process_name):
     """Gibt das Lautstärke-Steuerelement für den Prozess zurück."""
@@ -56,8 +56,6 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
         else:
             volume_control.SetMasterVolume(target_volume_scalar, None)
         
-        # Speichern des neuen gültigen Wertes
-        CURRENT_DISPLAY_VALUES[regler_index] = filtered_value
         is_updated = True 
     else:
         # Kein Lautstärke-Steuerelement gefunden
@@ -75,7 +73,7 @@ def main():
     
     COM_PORT = 'COM9'
     BAUD_RATE = 115200
-    
+
     try:
         # CoInitialize muss einmal pro Thread aufgerufen werden, um COM-Objekte zu nutzen
         pythoncom.CoInitialize() 
@@ -104,20 +102,24 @@ def main():
                 line = ser.readline()
                 #Einlesen und Verarbeiten der Lautstärkedaten
                 if line:
-                    data_string = line.decode('utf-8').strip()
+                    data_string = line.decode('utf-8', errors='ignore').strip()
 
                     if '|' in data_string:
-                        str_values = data_string.split('|')
+                        str_values = [s.strip() for s in data_string.split('|')]
+
                         value_list=[]
                         for s in str_values:
                             value_list.append(int(s))
                         #Ändert die Lautstärke nur, wenn alle 5 Reglerwerte empfangen wurden
                         if len(value_list) == NUM_SLIDERS: 
                             for regler_index, value in enumerate(value_list):
-                                if APP_MAPPING[regler_index] != "Nicht zugeordnet":
                                 # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
                                     if set_filtered_volume(regler_index, value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
+
                                         value_changed = True
+                        else:
+                            print("WARNUNG: NUM_SLIDERS stimmt nicht mit empfangenen Werten überein.")
+                            continue
 
             # Aktualisiere die Konsolenausgabe nur bei value_changed = TRUE
                 if value_changed:

@@ -14,7 +14,7 @@ def load_app_mapping(filename, NUM_SLIDERS):
             next(reader)  # Überspringe die Header-Zeile
             for row in reader:  
                 try:                
-                    process_name = row[1] if row[1].strip() != "" else "Nicht zugeordnet"
+                    process_name = row[1] if row[1].strip() != "" else "NONE"
                     app_map.append(process_name)
                 except ValueError or IndexError:
                     # Ignoriere Zeilen mit ungültigem Index
@@ -22,7 +22,7 @@ def load_app_mapping(filename, NUM_SLIDERS):
                     
             Diff = NUM_SLIDERS - len(app_map) 
             while Diff > 0: 
-                app_map.append("Nicht zugeordnet")
+                app_map.append("NONE")
                 Diff -= 1
             if len(app_map) > NUM_SLIDERS:
                 app_map = app_map[:NUM_SLIDERS]
