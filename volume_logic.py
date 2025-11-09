@@ -70,10 +70,13 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
                             # einzelne Session fehlgeschlagen -> weiter zu nächsten
                             continue
                     is_updated = len(volume_control) > 0
-                else:
+                elif volume_control:
                     # Falls aus irgendeinem Grund ein einzelnes Interface zurückkam
                     volume_control.SetMasterVolume(target_volume_scalar, None)
                     is_updated = True
+                elif volume_control:
+                    print(f"Warnung: Kein Lautstärke-Steuerelement für {app_name} gefunden.")
+                    return False
         except Exception:
             is_updated = False
     else:
@@ -89,7 +92,7 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
 
 def main(): 
     CONFIG_FILE = 'config.csv'
-    
+    Sessions_active = []
     COM_PORT = 'COM9'
     BAUD_RATE = 115200
 
@@ -134,11 +137,13 @@ def main():
                             for regler_index, value in enumerate(value_list):
                                 # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
                                     if set_filtered_volume(regler_index, value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
-
+                                        Sessions_active[regler_index] = True
                                         value_changed = True
+                                    else:
+                                        Sessions_active[regler_index] = False   
                         else:
                             print("WARNUNG: NUM_SLIDERS stimmt nicht mit empfangenen Werten überein.")
-                            continue
+                            break
 
             # Aktualisiere die Konsolenausgabe nur bei value_changed = TRUE
                 if value_changed:
@@ -147,7 +152,7 @@ def main():
                     for i in range(NUM_SLIDERS):
                         name = APP_MAPPING[i]
                         current_vol_perc = int(CURRENT_DISPLAY_VALUES[i] * 100)
-                        print(f"Regler {i+1} ({name}): Lautstärke: {current_vol_perc}%")
+                        print(f"Regler {i+1} ({name}): Lautstärke: {current_vol_perc}%{" [AKTIV]" if Sessions_active[i] else ""}")
 
             except sp.SerialTimeoutException:
             # Kein Fehler, wenn Timeout erreicht wird, ohne Daten zu finden
