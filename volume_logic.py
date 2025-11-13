@@ -1,3 +1,4 @@
+from binascii import Error
 import serial as sp
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
@@ -35,24 +36,16 @@ def get_session_volume_control(process_name):
 
 def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
     """Setzt die Lautstärke unter Berücksichtigung von Debouncing und Skalierung."""
-           
-    # Wert prüfen (erwartet 0-100 vom Pico)
+
     try:
-        filtered_value = int(new_input_value)
+        target_volume_scalar = float(new_input_value)
     except ValueError:
         return False # Ungültiger Wert
-    #Skalierung auf 0.0 - 1.0
-    target_volume_scalar = (max(0, min(100, filtered_value)) / 100.0)
-
-    # 1. Filterung kleiner Änderungen (Debouncing)
-    last_value = CURRENT_DISPLAY_VALUES[regler_index]
-    if last_value != 0.0 and abs(target_volume_scalar - last_value) < MIN_CHANGE_THRESHOLD:
-        return False 
-    # 3. Lautstärke setzen
+ 
     app_name = APP_MAPPING[regler_index]
     volume_control = get_session_volume_control(app_name)
     
-    is_updated = False
+    Allright = True
     if volume_control:
         # Lautstärke setzen
         try:
@@ -69,33 +62,27 @@ def set_filtered_volume(regler_index, new_input_value, APP_MAPPING, CURRENT_DISP
                         except Exception:
                             # einzelne Session fehlgeschlagen -> weiter zu nächsten
                             continue
-                    is_updated = len(volume_control) > 0
-                elif volume_control:
+                else:
                     # Falls aus irgendeinem Grund ein einzelnes Interface zurückkam
-                    volume_control.SetMasterVolume(target_volume_scalar, None)
-                    is_updated = True
-                elif volume_control:
-                    print(f"Warnung: Kein Lautstärke-Steuerelement für {app_name} gefunden.")
-                    return False
+                    volume_control.SetMasterVolume(target_volume_scalar, None)         
+            active = True        
         except Exception:
-            is_updated = False
+           Allright = False
     else:
-        # Kein Lautstärke-Steuerelement gefunden
-        pass
-        is_updated = False
+        pass 
+        active = False
     # 4. Speichern des aktuellen Status für die Konsolenausgabe
     CURRENT_DISPLAY_VALUES[regler_index] = target_volume_scalar
-    return is_updated
-
+    return active, Allright
 
 # --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
 
 def main(): 
     CONFIG_FILE = 'config.csv'
-    Sessions_active = []
+    Sessions_active = [False for _ in range(NUM_SLIDERS)]
     COM_PORT = 'COM9'
     BAUD_RATE = 115200
-
+    value_changed = []
     try:
         # CoInitialize muss einmal pro Thread aufgerufen werden, um COM-Objekte zu nutzen
         pythoncom.CoInitialize() 
@@ -117,7 +104,7 @@ def main():
     # Initialisiert 5 Einträge
     try:
         while True:
-            value_changed = False 
+            value_changed = [] 
             APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
             try:
             # Liest eine Zeile vom seriellen Port (endet mit \r oder \n)
@@ -134,13 +121,11 @@ def main():
                             value_list.append(int(s))
                         #Ändert die Lautstärke nur, wenn alle 5 Reglerwerte empfangen wurden
                         if len(value_list) == NUM_SLIDERS: 
-                            for regler_index, value in enumerate(value_list):
-                                # Setzt die Lautstärke, gibt True zurück, wenn PyCaw es gesetzt hat
-                                    if set_filtered_volume(regler_index, value, APP_MAPPING, CURRENT_DISPLAY_VALUES):
-                                        Sessions_active[regler_index] = True
-                                        value_changed = True
-                                    else:
-                                        Sessions_active[regler_index] = False   
+                            for index, value in enumerate(value_list):
+                                value = (max(0, min(100, value)) / 100.0)
+                                if CURRENT_DISPLAY_VALUES[index] != 0.0 and abs(value - CURRENT_DISPLAY_VALUES[index]) < MIN_CHANGE_THRESHOLD:
+                                    value_changed.append(True)
+                                    Sessions_active[index], value_changed = set_filtered_volume(index, value, APP_MAPPING, CURRENT_DISPLAY_VALUES, Sessions_active[index])                
                         else:
                             print("WARNUNG: NUM_SLIDERS stimmt nicht mit empfangenen Werten überein.")
                             break
@@ -157,10 +142,10 @@ def main():
             except sp.SerialTimeoutException:
             # Kein Fehler, wenn Timeout erreicht wird, ohne Daten zu finden
                 pass
-            except Exception as e:
+            #except Exception as e:
             # Allgemeine Fehlerbehandlung
-                print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
-                time.sleep(1)
+                #print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
+                #time.sleep(1)
     except KeyboardInterrupt:        
         ser.close()
         try:
