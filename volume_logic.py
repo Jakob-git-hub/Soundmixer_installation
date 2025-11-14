@@ -1,3 +1,4 @@
+#Fertig
 from binascii import Error
 import serial as sp
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
