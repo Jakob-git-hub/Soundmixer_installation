@@ -118,28 +118,36 @@ def main():
                         #Ändert die Lautstärke nur, wenn alle 5 Reglerwerte empfangen wurden
                         if len(value_list) == NUM_SLIDERS: 
                             for index, value in enumerate(value_list):
+
                                 app_name = APP_MAPPING[index]
                                 value = (max(0, min(100, value)) / 100.0)
                                 volume_control = get_session_volume_control(app_name)
-
+                                #Wird geupdated, wenn der Status sich ändert (aktiv/inaktiv) oder die Lautstärke sich signifikant ändert
                                 if volume_control:
+                                    if Sessions_active[index]==False:
+                                        update = True
                                     Sessions_active[index] = True
                                 else:
+                                    if Sessions_active[index]==True:
+                                        update = True
                                     Sessions_active[index] = False
+                                
 
                                 if abs(value - CURRENT_DISPLAY_VALUES[index]) > MIN_CHANGE_THRESHOLD and Sessions_active[index]==True:                                    
                                     set_filtered_volume(index, value,volume_control, CURRENT_DISPLAY_VALUES, Sessions_active[index])                
                                     update = True
-                                   
-                                    os.system('cls' if os.name == 'nt' else 'clear')
-                                    print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
-                                                                                
-                                if update == True:
-                                    print(f"Regler {index+1} ({APP_MAPPING[index]}): Lautstärke: {int(CURRENT_DISPLAY_VALUES[index] * 100)}%{" [AKTIV]" if Sessions_active[index] else ""}")
-                                    loop = loop + 1
-                                    if loop == NUM_SLIDERS:
-                                        loop = 0
-                                        update = False
+
+
+                                if update == True:                                                                                                                                                      
+                                    if loop == 0:
+                                        os.system('cls' if os.name == 'nt' else 'clear')
+                                        print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
+                                    if loop == index:
+                                        print(f"Regler {index+1} ({APP_MAPPING[index]}): Lautstärke: {int(CURRENT_DISPLAY_VALUES[index] * 100)}%{" [AKTIV]" if Sessions_active[index] else ""}")
+                                        loop = loop + 1
+                                        if loop == NUM_SLIDERS:
+                                            loop = 0
+                                            update = False
                         else:
                             print("WARNUNG: NUM_SLIDERS stimmt nicht mit empfangenen Werten überein.")
                             break
@@ -147,10 +155,10 @@ def main():
             except sp.SerialTimeoutException:
             # Kein Fehler, wenn Timeout erreicht wird, ohne Daten zu finden
                 pass
-            #except Exception as e:
-            # Allgemeine Fehlerbehandlung
-                #print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
-                #time.sleep(1)
+            except Exception as e:
+            #Allgemeine Fehlerbehandlung
+                print(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
+                time.sleep(1)
     except KeyboardInterrupt:        
         ser.close()
         try:
