@@ -41,7 +41,7 @@ def set_filtered_volume(regler_index, new_input_value,volume_control, CURRENT_DI
         target_volume_scalar = float(new_input_value)
     except ValueError:
         return False # Ungültiger Wert
-    Allright = True
+    
 
         # Lautstärke setzen
     try:
@@ -61,13 +61,13 @@ def set_filtered_volume(regler_index, new_input_value,volume_control, CURRENT_DI
             else:
                     # Falls aus irgendeinem Grund ein einzelnes Interface zurückkam
                 volume_control.SetMasterVolume(target_volume_scalar, None)         
-        Allright = True        
+                
     except Exception:
-        Allright = False
+        pass
 
     # 4. Speichern des aktuellen Status für die Konsolenausgabe
     CURRENT_DISPLAY_VALUES[regler_index] = target_volume_scalar
-    return Allright
+    
 
 # --- HAUPTSCHLEIFE FÜR SERIELLE KOMMUNIKATION ---
 
@@ -127,13 +127,13 @@ def main():
                                 else:
                                     Sessions_active[index] = False
 
-                                if abs(value - CURRENT_DISPLAY_VALUES[index]) < MIN_CHANGE_THRESHOLD:                                    
-                                    Allright = set_filtered_volume(index, value,volume_control, CURRENT_DISPLAY_VALUES, Sessions_active[index])                
-                                    if Allright ==True:
-                                        os.system('cls' if os.name == 'nt' else 'clear')
-                                        print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
-                                        update = True
-                                            
+                                if abs(value - CURRENT_DISPLAY_VALUES[index]) > MIN_CHANGE_THRESHOLD and Sessions_active[index]==True:                                    
+                                    set_filtered_volume(index, value,volume_control, CURRENT_DISPLAY_VALUES, Sessions_active[index])                
+                                    update = True
+                                   
+                                    os.system('cls' if os.name == 'nt' else 'clear')
+                                    print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
+                                                                                
                                 if update == True:
                                     print(f"Regler {index+1} ({APP_MAPPING[index]}): Lautstärke: {int(CURRENT_DISPLAY_VALUES[index] * 100)}%{" [AKTIV]" if Sessions_active[index] else ""}")
                                     loop = loop + 1
