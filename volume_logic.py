@@ -74,7 +74,9 @@ def set_filtered_volume(regler_index, new_input_value,volume_control, CURRENT_DI
 
 def main(): 
     CONFIG_FILE = 'config.csv'
-    Sessions_active = [False for _ in range(NUM_SLIDERS)]
+    APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
+    
+    Sessions_active = [True for _ in range(NUM_SLIDERS)]
     COM_PORT = 'COM9'
     BAUD_RATE = 115200
     
@@ -102,7 +104,7 @@ def main():
     try:
         while True:
             
-            APP_MAPPING = load_app_mapping(CONFIG_FILE, NUM_SLIDERS)
+            
             try:
             # Liest eine Zeile vom seriellen Port (endet mit \r oder \n)
                 line = ser.readline()
@@ -123,16 +125,13 @@ def main():
                                 app_name = APP_MAPPING[index]
                                 value = (max(0, min(100, value)) / 100.0)
                                 volume_control = get_session_volume_control(app_name)
+                                active = True if volume_control else False
                                 #Wird geupdated, wenn der Status sich ändert (aktiv/inaktiv) oder die Lautstärke sich signifikant ändert
-                                if volume_control:
-                                    if Sessions_active[index]==False:
-                                        update = True
-                                    Sessions_active[index] = True
-                                else:
-                                    if Sessions_active[index]==True:
-                                        update = True
-                                    Sessions_active[index] = False
+                                if active != Sessions_active[index]:
+                                    update = True                                    
                                 
+                                    
+                                Sessions_active[index] = active
 
                                 if abs(value - CURRENT_DISPLAY_VALUES[index]) > MIN_CHANGE_THRESHOLD and Sessions_active[index]==True:                                    
                                     set_filtered_volume(index, value,volume_control, CURRENT_DISPLAY_VALUES, Sessions_active[index])                
@@ -143,6 +142,7 @@ def main():
                                     if loop == 0:
                                         os.system('cls' if os.name == 'nt' else 'clear')
                                         print("--- Serielle Lautstärkeregelung aktiv (5 Regler) ---")
+                                        
                                     if loop == index:
                                         print(f"Regler {index+1} ({APP_MAPPING[index]}): Lautstärke: {int(CURRENT_DISPLAY_VALUES[index] * 100)}%{" [AKTIV]" if Sessions_active[index] else ""}")
                                         loop = loop + 1

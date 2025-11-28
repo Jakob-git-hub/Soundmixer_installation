@@ -109,7 +109,7 @@ def get_all_available_apps():
     """Kombiniert alle Quellen (Installiert, Steam, Spezielle) zu einer Master-Liste."""
     
     # Spezielle Einträge
-    master_list = ["System", "KEINE ZUORDNUNG"]
+    master_list = ["System", "KEINE ZUORDNUNG", "Spotify.exe", "firefox.exe", "Discord.exe", "chrome.exe"]
     
     # 1. Installierte Programme (Display Name und EXE-Name)
     installed = get_installed_programs()
@@ -185,7 +185,7 @@ class VolumeMixerGUI:
                 writer = csv.writer(file)
                 writer.writerow(["Regler_Index", "Prozess_Name"])
                 writer.writerows(new_mapping)
-            messagebox.showinfo("Speichern erfolgreich", "Die Konfiguration wurde gespeichert. Starten Sie das Logik-Skript neu.")
+            #messagebox.showinfo("Speichern erfolgreich", "Die Konfiguration wurde gespeichert. Starten Sie das Logik-Skript neu.")
             return True
         except Exception as e:
             messagebox.showerror("Fehler beim Speichern", f"Fehler beim Speichern der Datei: {e}")
@@ -226,7 +226,7 @@ class VolumeMixerGUI:
         """Erstellt die GUI-Elemente im CustomTkinter-Stil."""
         
         # Rahmen für Inhalt
-        main_frame = ctk.CTkFrame(self.master, padding=20)
+        main_frame = ctk.CTkFrame(self.master)
         main_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
         # Titel (CTkLabel)
@@ -254,11 +254,8 @@ class VolumeMixerGUI:
         ctk.CTkFrame(main_frame, height=2, fg_color="gray50").grid(row=NUM_SLIDERS + 1, columnspan=2, sticky='ew', pady=(15, 15))
 
         # Buttons
-        ctk.CTkButton(main_frame, text="Konfiguration speichern", command=self.save_mapping_to_file,
+        ctk.CTkButton(main_frame, text="Konfiguration speichern", command=self.save_mapping_to_file and self.start_logic_script,
                       fg_color="#3B82F6", hover_color="#2563EB").grid(row=NUM_SLIDERS + 2, column=0, columnspan=2, pady=(10, 5), sticky='ew', padx=10)
-        
-        ctk.CTkButton(main_frame, text="Logik-Skript starten", command=self.start_logic_script,
-                      fg_color="#10B981", hover_color="#059669").grid(row=NUM_SLIDERS + 3, column=0, columnspan=2, pady=(5, 10), sticky='ew', padx=10)
         
         # Info-Feld
         ctk.CTkLabel(main_frame, text="Hinweis: Die App-Liste umfasst installierte Apps und Steam-Spiele (keine laufenden Prozesse).", 
@@ -269,9 +266,10 @@ class VolumeMixerGUI:
         """Versucht, das volume_logic.py Skript auszuführen."""
         
         # 1. Konfiguration speichern (obligatorisch)
-        if not self.save_mapping_to_file():
+        if not self.save_mapping_to_file() and not  self.stop() :
              return
-
+        
+             # Prüft, ob das Modul importiert werden kann
         # 2. Skript im Hintergrund starten (verwendet den gebündelten Interpreter)
         try:
             # Statt os.path.join verwenden wir resource_path
@@ -280,11 +278,20 @@ class VolumeMixerGUI:
             # Im gebündelten Zustand ist sys.executable die .exe selbst!
             subprocess.Popen([sys.executable, script_path]) 
             
-            messagebox.showinfo("Skript gestartet", "Das Volume-Logik-Skript wurde im Hintergrund gestartet.")
+            #messagebox.showinfo("Skript gestartet", "Das Volume-Logik-Skript wurde im Hintergrund gestartet.")
         except FileNotFoundError:
             messagebox.showerror("Fehler", "Das Skript 'volume_logic.py' wurde nicht gefunden. Fehler bei der Pfadbestimmung.")
         except Exception as e:
             messagebox.showerror("Fehler beim Start", f"Fehler beim Starten des Python-Skripts: {e}")
+
+    def stop(self):
+        try:            # Beendet alle laufenden Instanzen von volume_logic.py
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                if 'volume_logic.py' in ' '.join(proc.info['cmdline']):
+                    proc.terminate()  # Versucht, den Prozess ordentlich zu beenden
+                    proc.wait(timeout=5)  # Wartet bis zu 5 Sekunden
+        except Exception as e:
+            pass
 
 if __name__ == '__main__':
     root = ctk.CTk()
