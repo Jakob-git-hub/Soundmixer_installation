@@ -22,7 +22,7 @@ def resource_path(relative_path):
         base_path = sys._MEIPASS
     except Exception:
         # Normaler Skriptmodus
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     
     return os.path.join(base_path, relative_path)
 
@@ -254,7 +254,7 @@ class VolumeMixerGUI:
         ctk.CTkFrame(main_frame, height=2, fg_color="gray50").grid(row=NUM_SLIDERS + 1, columnspan=2, sticky='ew', pady=(15, 15))
 
         # Buttons
-        ctk.CTkButton(main_frame, text="Konfiguration speichern", command=self.save_mapping_to_file and self.start_logic_script,
+        ctk.CTkButton(main_frame, text="Konfiguration speichern", command=self.start_logic_script,
                       fg_color="#3B82F6", hover_color="#2563EB").grid(row=NUM_SLIDERS + 2, column=0, columnspan=2, pady=(10, 5), sticky='ew', padx=10)
         
         # Info-Feld
@@ -266,8 +266,10 @@ class VolumeMixerGUI:
         """Versucht, das volume_logic.py Skript auszuführen."""
         
         # 1. Konfiguration speichern (obligatorisch)
-        if not self.save_mapping_to_file() and not  self.stop() :
-             return
+        if not self.save_mapping_to_file():
+            return
+
+        self.stop()
         
              # Prüft, ob das Modul importiert werden kann
         # 2. Skript im Hintergrund starten (verwendet den gebündelten Interpreter)
@@ -287,7 +289,8 @@ class VolumeMixerGUI:
     def stop(self):
         try:            # Beendet alle laufenden Instanzen von volume_logic.py
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                if 'volume_logic.py' in ' '.join(proc.info['cmdline']):
+                cmdline = proc.info.get('cmdline') or []
+                if 'volume_logic.py' in ' '.join(cmdline):
                     proc.terminate()  # Versucht, den Prozess ordentlich zu beenden
                     proc.wait(timeout=5)  # Wartet bis zu 5 Sekunden
         except Exception as e:
@@ -300,4 +303,3 @@ if __name__ == '__main__':
     root.resizable(False, False) # Größe fixieren
     app = VolumeMixerGUI(root)
     root.mainloop()
-
