@@ -3,7 +3,6 @@ import csv
 CONFIG_FILE = 'config.csv'
 DEFAULT_MAPPING = ["System", "Spotify.exe", "firefox.exe", "discord.exe", "chrome.exe"]
 
-print("START")
 def load_app_mapping(filename, NUM_SLIDERS):
     app_map = []
     
@@ -14,9 +13,9 @@ def load_app_mapping(filename, NUM_SLIDERS):
             next(reader)  # Überspringe die Header-Zeile
             for row in reader:  
                 try:                
-                    process_name = row[1] if row[1].strip() != "" else "NONE"
+                    process_name = row[1] if len(row) > 1 and row[1].strip() != "" else "NONE"
                     app_map.append(process_name)
-                except ValueError or IndexError:
+                except (ValueError, IndexError):
                     # Ignoriere Zeilen mit ungültigem Index
                     continue
                     
@@ -29,7 +28,10 @@ def load_app_mapping(filename, NUM_SLIDERS):
             return app_map
             
     except FileNotFoundError:
-        return DEFAULT_MAPPING
+        defaults = DEFAULT_MAPPING[:NUM_SLIDERS]
+        while len(defaults) < NUM_SLIDERS:
+            defaults.append("NONE")
+        return defaults
 
 if __name__ == "__main__":
     APP_MAPPING = load_app_mapping(CONFIG_FILE, 5)
