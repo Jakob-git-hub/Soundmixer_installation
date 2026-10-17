@@ -1,6 +1,6 @@
 #Fertig
 from binascii import Error
-import pyserial as sp
+import serial as sp
 from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
 import time, os, pythoncom
